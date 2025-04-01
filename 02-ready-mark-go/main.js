@@ -45,7 +45,7 @@ class Example extends Phaser.Scene {
     mark_set(){
         this.light = this.add.image(550, 50, 'light_red')
         this.delay_waiting = Phaser.Math.Between(1000, 5000)
-        this.info.setText('Czekaj na zielone światło...') 
+        this.info.setText('Czekaj na zielone światło...')
         this.timer = this.time.addEvent({
             delay: this.delay_waiting,
             callback: this.mark_set_go,
@@ -80,4 +80,3 @@ const config = {
 }
 
 const game = new Phaser.Game(config)
-
