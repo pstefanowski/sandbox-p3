@@ -29,16 +29,22 @@ class Example extends Phaser.Scene
         {
             this.ship.setAngularVelocity(0.008);
         }
+        else
+        {
+            this.ship.setAngularVelocity(0);
+        }
 
         // Przyspieszanie statku w kierunku, w którym jest zwrócony
         if (this.cursors.up.isDown)
         {
             const angle = this.ship.rotation; // Pobierz aktualny kąt obrotu statku
-            const forceX = Math.cos(angle) * 0.02; // Oblicz składową X wektora ruchu
-            const forceY = Math.sin(angle) * 0.02; // Oblicz składową Y wektora ruchu
+            const forceX = Math.cos(angle) * 0.001; // Oblicz składową X wektora ruchu
+            const forceY = Math.sin(angle) * 0.001; // Oblicz składową Y wektora ruchu
             const velocity = this.ship.body.velocity; // Pobierz aktualną prędkość
+            console.log(`velocity.x: ${Math.abs(velocity.x)}, velocity.y: ${Math.abs(velocity.y)}`); // Debug
             const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y); // Oblicz prędkość
-            if (speed < 1) {
+
+            if (speed < 2) {
                 this.ship.applyForce({ x: forceX, y: forceY }); // Zastosuj siłę w kierunku obrotu
             }
             
@@ -60,7 +66,6 @@ class Example extends Phaser.Scene
     {
         const velocity = this.ship.body.velocity; // Pobierz aktualną prędkość
         const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y); // Oblicz prędkość
-        console.log(`Speed: ${speed}`); // Wyświetl prędkość w konsoli
         return speed;
     }
 }
