@@ -21,6 +21,10 @@ class Example extends Phaser.Scene
 
     update ()
     {
+        const maxSpeed = 2; // Maksymalna prędkość samochodu
+        const acceleration = 0.001; // Przyspieszenie
+        //const turnSpeed = 0.025; // Prędkość skręcania
+
         if (this.cursors.left.isDown)
         {
             this.ship.setAngularVelocity(-0.008);
@@ -38,17 +42,18 @@ class Example extends Phaser.Scene
         if (this.cursors.up.isDown)
         {
             const angle = this.ship.rotation; // Pobierz aktualny kąt obrotu statku
-            const forceX = Math.cos(angle) * 0.001; // Oblicz składową X wektora ruchu
-            const forceY = Math.sin(angle) * 0.001; // Oblicz składową Y wektora ruchu
+            const forceX = Math.cos(angle) * acceleration; // Oblicz składową X wektora ruchu
+            const forceY = Math.sin(angle) * acceleration; // Oblicz składową Y wektora ruchu
             const velocity = this.ship.body.velocity; // Pobierz aktualną prędkość
-            console.log(`velocity.x: ${Math.abs(velocity.x)}, velocity.y: ${Math.abs(velocity.y)}`); // Debug
+            //console.log(`velocity.x: ${Math.abs(velocity.x)}, velocity.y: ${Math.abs(velocity.y)}`); // Debug
             const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y); // Oblicz prędkość
 
-            if (speed < 2) {
+            if (speed < maxSpeed) {
                 this.ship.applyForce({ x: forceX, y: forceY }); // Zastosuj siłę w kierunku obrotu
             }
             
         }
+
         // Aktualizacja prędkości w kierunku obrotu
         const velocity = this.ship.body.velocity; // Pobierz aktualną prędkość
         const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y); // Oblicz prędkość
