@@ -9,30 +9,17 @@ class Example extends Phaser.Scene
     {
         
         // Dodanie samochodu do sceny
+        this.maxSpeed = 250; // Maximum speed
         this.car = this.physics.add.sprite(400, 300, 'car');
         this.car.setDamping(true); // Włącz tłumienie prędkości
         this.car.setDrag(0.95); // Ustaw opór ruchu
-        this.car.setMaxVelocity(200); // Maksymalna prędkość
+        this.car.setMaxVelocity(this.maxSpeed); // Maksymalna prędkość
 
         // Tworzenie klawiszy sterowania
         this.cursors = this.input.keyboard.createCursorKeys();
 
         // Zmienna do śledzenia czasu wciśnięcia klawisza UP
         this.acceleration = 0; // Początkowe przyspieszenie
-        this.maxAcceleration = 200; // Maksymalne przyspieszenie
-
-        this.accelerationSpeedLevel1 = 50;
-        this.accelerationSpeedLevel2 = 80;
-        this.accelerationSpeedLevel3 = 120;
-        this.accelerationSpeedLevel4 = 140;
-        this.accelerationSpeedLevel5 = 160;
-        //this.minAccelerationRate = 0.01;
-        this.accelerationRateLevel1 = 0.6; // Podstawowa szybkość wzrostu przyspieszenia
-        this.accelerationRateLevel2 = 0.5; // Podstawowa szybkość wzrostu przyspieszenia
-        this.accelerationRateLevel3 = 0.4; // Podstawowa szybkość wzrostu przyspieszenia
-        this.accelerationRateLevel4 = 0.3; // Podstawowa szybkość wzrostu przyspieszenia
-        this.accelerationRateLevel5 = 0.15; // Podstawowa szybkość wzrostu przyspieszenia
-        this.accelerationRateLevel6 = 0.05; // Podstawowa szybkość wzrostu przyspieszenia
 
 
         // Variables for acceleration and speed
@@ -41,7 +28,7 @@ class Example extends Phaser.Scene
         this.deaccelerationRate = 1; // Rate of deceleration
         this.reverseAcceleration = 50; // Reverse acceleration
         this.turnSpeed = 150; // Turning speed
-        this.maxSpeed = 250; // Maximum speed
+        
 
         // Dictionary for speed levels and acceleration rates
         this.accelerationLevels = {
@@ -63,15 +50,29 @@ class Example extends Phaser.Scene
             180: 0.08,
             250: 0.05
         };
+        this.multiplerAccelerationRate = 1.3;
+
+        this.isAccelerating = false;
+
 
         //this.accelerationRate = 2; // Szybkość wzrostu przyspieszenia
         this.deaccelerationRate = 1; // Szybkość spadku przyspieszenia
         this.reverseAcceleration = 50;
-        this.turnSpeed = 150; // Prędkość skręcania
+        this.turnSpeed = 50; // Prędkość skręcania
         this.brakeForce = 10; // Siła hamowania
         this.maxSpeed = 250;
 
         this.speedText = this.add.text(10, 10, 'Speed: 0', { font: '20px Arial', fill: '#ffffff' });
+
+        // Obsługa klawisza SPACE
+        this.input.keyboard.on('keydown-SPACE', () => {
+            //this.isAccelerating = !this.isAccelerating; // Przełącz stan przyspieszenia
+            this.isAccelerating = true
+        });
+
+        this.input.keyboard.on('keyup-SPACE', () => {
+            this.isAccelerating = false
+        });
     }
 
     update ()
@@ -80,12 +81,8 @@ class Example extends Phaser.Scene
         // Oblicz aktualną prędkość
         const speed = this.get_speed(this.car);
 
-        // Oblicz dynamiczne accelerationRate na podstawie prędkości
-        //const accelerationRate = this.get_acceleration_rate(speed);
-        
-        
         // FORWARD - UP
-        if (this.cursors.up.isDown)
+        if (this.isAccelerating)
         {
             // Zwiększaj przyspieszenie, aż osiągnie maksymalną wartość
             if (this.acceleration < this.maxAcceleration) {
@@ -158,7 +155,7 @@ class Example extends Phaser.Scene
         // Iterate through the dictionary to find the appropriate acceleration rate
         for (const [level, rate] of Object.entries(this.accelerationLevels)) {
             if (speed <= level) {
-                return rate;
+                return rate * this.multiplerAccelerationRate;
             }
         }
 
