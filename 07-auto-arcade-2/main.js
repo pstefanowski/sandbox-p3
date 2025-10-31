@@ -25,9 +25,10 @@ class Example extends Phaser.Scene
         // Variables for acceleration and speed
         this.acceleration = 0; // Initial acceleration
         this.maxAcceleration = 200; // Maximum acceleration
-        this.deaccelerationRate = 0.7; // Rate of deceleration
-        this.reverseAcceleration = 100; // Reverse acceleration
-        this.turnSpeed = 50; // Turning speed
+        this.deaccelerationRate = 1; // Rate of deceleration
+        this.reverseAcceleration = 50; // Reverse acceleration
+        this.turnSpeed = 150; // Turning speed
+        
 
         // Dictionary for speed levels and acceleration rates
         this.accelerationLevels = {
@@ -59,6 +60,7 @@ class Example extends Phaser.Scene
         this.reverseAcceleration = 50;
         this.turnSpeed = 50; // Prędkość skręcania
         this.brakeForce = 10; // Siła hamowania
+        this.maxSpeed = 250;
 
         this.speedText = this.add.text(10, 10, 'Speed: 0', { font: '20px Arial', fill: '#ffffff' });
 

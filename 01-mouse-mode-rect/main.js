@@ -1,6 +1,8 @@
 class Example extends Phaser.Scene
 {
     graphics
+    movementX
+    movementY
     preload()
     {
         this.load.image('ship', 'assets/sprites/ship.png');
@@ -29,6 +31,8 @@ class Example extends Phaser.Scene
                 // Calculate new position
                 let newX = this.sprite.x + pointer.movementX;
                 let newY = this.sprite.y + pointer.movementY;
+                this.movementX = pointer.movementX;
+                this.movementY = pointer.movementY;
 
                 // Restrict movement to the defined rectangle
                 if (newX < 800) {
@@ -74,7 +78,7 @@ class Example extends Phaser.Scene
         // mouse cursor, etc.
         this.input.manager.events.on('pointerlockchange', event =>
         {
-            this.updateLockText(event.isPointerLocked, this.sprite.x, this.sprite.y);
+            this.updateLockText(event.isPointerLocked);
         });
 
         this.lockText = this.add.text(16, 16, '', {
@@ -94,6 +98,7 @@ class Example extends Phaser.Scene
         this.lockText.setText([
             isLocked ? 'The pointer is now locked!' : 'The pointer is now unlocked.',
             `Sprite is at: (${this.sprite.x},${this.sprite.y})`,
+            `movementXY: (${pointer.movementX},${pointer.movementY})`,
             'Press Q to release pointer lock.'
         ]);
     }

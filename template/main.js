@@ -2,11 +2,12 @@ class Example extends Phaser.Scene
 {
     preload ()
     {
-        
+
     }
+
     create ()
     {
-        
+
     }
 
     update ()
