@@ -1,25 +1,41 @@
 class Example extends Phaser.Scene
 {
     graphics
-    movementX
-    movementY
+    movementX = 0
+    movementY = 0
+
+    // Konfiguracja strefy sterowania
+    zoneSize = 250;
+    zoneX = 0;
+    zoneY = 0;
+    zoneCenterX = 0;
+    zoneCenterY = 0;
+
     preload()
     {
         this.load.image('ship', 'assets/sprites/ship.png');
-        this.load.image('hit', 'assets/sprites/block-ice.png');
     }
 
     create ()
     {
-        this.sprite = this.add.sprite(900, 100, 'ship');
+        const { width } = this.sys.game.config;
+        
+        // Dynamiczne wyliczanie pozycji strefy (prawy górny róg)
+        this.zoneX = width - this.zoneSize;
+        this.zoneY = 0;
+        this.zoneCenterX = this.zoneX + (this.zoneSize / 2);
+        this.zoneCenterY = this.zoneY + (this.zoneSize / 2);
 
-        // Pointer lock will only work after an 'engagement gesture', e.g. mousedown, keypress, etc.
-        this.input.keyboard.on('keydown-Q', function (pointer)
-        {
-            this.sprite.x = 900;
-            this.sprite.y = 100;
-            this.input.mouse.requestPointerLock();
-        }, this);
+        this.graphics = this.add.graphics();
+        this.graphics.lineStyle(2, 0x00ff00, 1); // Zielone obramowanie
+        this.graphics.strokeRect(this.zoneX, this.zoneY, this.zoneSize, this.zoneSize);
+
+        // Mały krzyżyk na środku obszaru
+        this.graphics.lineStyle(1, 0xffffff, 0.8);
+        this.graphics.lineBetween(this.zoneCenterX - 5, this.zoneCenterY, this.zoneCenterX + 5, this.zoneCenterY);
+        this.graphics.lineBetween(this.zoneCenterX, this.zoneCenterY - 5, this.zoneCenterX, this.zoneCenterY + 5);
+
+        this.sprite = this.add.sprite(this.zoneCenterX, this.zoneCenterY, 'ship');
 
         // When locked, you will have to use the movementX and movementY properties of the pointer
         // (since a locked cursor's xy position does not update)
@@ -34,42 +50,40 @@ class Example extends Phaser.Scene
                 this.movementX = pointer.movementX;
                 this.movementY = pointer.movementY;
 
-                // Restrict movement to the defined rectangle
-                if (newX < 800) {
-                    newX = 800;
-                } else if (newX > 1000) {
-                    newX = 1000;
-                }
+                const halfWidth = this.sprite.displayWidth / 2;
+                const halfHeight = this.sprite.displayHeight / 2;
 
-                if (newY < 0) {
-                    newY = 0;
-                } else if (newY > 200) {
-                    newY = 200;
-                }
+                // Ograniczenie ruchu do strefy z uwzględnieniem wymiarów statku
+                newX = Phaser.Math.Clamp(newX, this.zoneX + halfWidth, this.zoneX + this.zoneSize - halfWidth);
+                newY = Phaser.Math.Clamp(newY, this.zoneY + halfHeight, this.zoneY + this.zoneSize - halfHeight);
 
                 // Update sprite position
                 this.sprite.x = newX;
                 this.sprite.y = newY;
 
                 // Update rotation based on movement
-                if (pointer.movementX > 0) { 
-                    this.sprite.setRotation(0.1); 
-                } else if (pointer.movementX < 0) { 
-                    this.sprite.setRotation(-0.1);
-                } else { 
-                    this.sprite.setRotation(0);
-                }
+                // Im bardziej statek jest odchylony od środka strefy w osi X, tym większa rotacja
+                const maxOffset = this.zoneSize / 2;
+                const currentOffset = this.sprite.x - this.zoneCenterX;
+                const maxTilt = 0.5; // Maksymalne wychylenie w radianach (ok. 28 stopni)
+
+                this.sprite.setRotation((currentOffset / maxOffset) * maxTilt);
 
                 this.updateLockText(true);
             }
         }, this);
 
-        // Exit pointer lock when Q is pressed. Browsers will also exit pointer lock when escape is pressed.
+        // Toggle Pointer Lock mode with 'Q'
         this.input.keyboard.on('keydown-Q', function (event)
         {
             if (this.input.mouse.locked)
             {
                 this.input.mouse.releasePointerLock();
+            }
+            else
+            {
+                this.sprite.setPosition(this.zoneCenterX, this.zoneCenterY); // Reset to center of the active zone
+                this.input.mouse.requestPointerLock();
             }
         }, this);
 
@@ -95,10 +109,17 @@ class Example extends Phaser.Scene
 
     updateLockText (isLocked)
     {
+        const dx = Math.abs(Math.round(this.sprite.x - this.zoneCenterX));
+        const dy = Math.abs(Math.round(this.sprite.y - this.zoneCenterY));
+        const distance = Math.round(Phaser.Math.Distance.Between(this.sprite.x, this.sprite.y, this.zoneCenterX, this.zoneCenterY));
+
         this.lockText.setText([
             isLocked ? 'The pointer is now locked!' : 'The pointer is now unlocked.',
             `Sprite is at: (${this.sprite.x},${this.sprite.y})`,
-            `movementXY: (${pointer.movementX},${pointer.movementY})`,
+            `movementXY: (${this.movementX},${this.movementY})`,
+            `odchylenieOdSrodkaX: (${dx})`,
+            `odchylenieOdSrodkaY: (${dy})`,
+            `odchylenieOdSrodka: (${distance})`,
             'Press Q to release pointer lock.'
         ]);
     }
