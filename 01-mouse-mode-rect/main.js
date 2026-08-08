@@ -65,7 +65,8 @@ class Example extends Phaser.Scene
                 // Im bardziej statek jest odchylony od środka strefy w osi X, tym większa rotacja
                 const maxOffset = this.zoneSize / 2;
                 const currentOffset = this.sprite.x - this.zoneCenterX;
-                const maxTilt = 0.5; // Maksymalne wychylenie w radianach (ok. 28 stopni)
+                //const maxTilt = 0.5; // Maksymalne wychylenie w radianach (ok. 28 stopni)
+                const maxTilt = 1;
 
                 this.sprite.setRotation((currentOffset / maxOffset) * maxTilt);
 
@@ -73,7 +74,7 @@ class Example extends Phaser.Scene
             }
         }, this);
 
-        // Toggle Pointer Lock mode with 'Q'
+        // Toggle qPointer Lock mode with 'Q'
         this.input.keyboard.on('keydown-Q', function (event)
         {
             if (this.input.mouse.locked)
