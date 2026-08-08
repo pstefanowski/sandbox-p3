@@ -48,8 +48,16 @@ class EnemyTank {
 
         this.shadow.setPosition(this.tank.x, this.tank.y);
         this.shadow.setRotation(this.tank.rotation);
-
         this.turret.setPosition(this.tank.x, this.tank.y);
+
+        if (this.scene.isCountdown || this.scene.isGameOver) {
+            if (this.tank.body) this.tank.body.setVelocity(0, 0);
+            return;
+        }
+
+        if (this.tank.body && this.tank.body.velocity.x === 0 && this.tank.body.velocity.y === 0) {
+            this.scene.physics.velocityFromRotation(this.tank.rotation, this.moveSpeed, this.tank.body.velocity);
+        }
 
         if (!this.player || !this.player.active) return;
 
@@ -58,7 +66,7 @@ class EnemyTank {
 
         const dist = Phaser.Math.Distance.Between(this.tank.x, this.tank.y, this.player.x, this.player.y);
 
-        if (dist < 350 && time > this.nextFire) {
+        if (dist < 350 && time > this.nextFire && time > (this.scene.enemyShootingGraceUntil || 0)) {
             this.nextFire = time + this.fireRate;
             this.fireBullet(angleToPlayer);
         }
@@ -185,7 +193,22 @@ class MainScene extends Phaser.Scene {
         this.nextFire = 0;
 
         this.logo = this.add.image(400, 200, 'logo').setScrollFactor(0).setDepth(100);
+        this.startHint = this.add.text(400, 360, 'KLIKNIJ ABY ROZPOCZĄĆ', {
+            fontSize: '20px',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            backgroundColor: '#2563eb',
+            padding: { x: 16, y: 8 }
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+
+        this.isCountdown = true;
+
         this.input.once('pointerdown', () => {
+            if (this.startHint) {
+                this.startHint.destroy();
+                this.startHint = null;
+            }
             if (this.logo) {
                 this.tweens.add({
                     targets: this.logo,
@@ -196,12 +219,78 @@ class MainScene extends Phaser.Scene {
                             this.logo.destroy();
                             this.logo = null;
                         }
+                        this.startCountdown();
                     }
                 });
+            } else {
+                this.startCountdown();
             }
         });
 
         this.createHUD();
+    }
+
+    startCountdown() {
+        this.isCountdown = true;
+
+        const overlay = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.4)
+            .setScrollFactor(0)
+            .setDepth(190);
+
+        const countText = this.add.text(400, 260, '3', {
+            fontSize: '96px',
+            fontFamily: 'Segoe UI, Outfit, sans-serif',
+            fontStyle: 'bold',
+            color: '#f59e0b',
+            stroke: '#000000',
+            strokeThickness: 6
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+        let count = 3;
+
+        countText.setScale(1.5);
+        this.tweens.add({
+            targets: countText,
+            scale: 1.0,
+            duration: 400,
+            ease: 'Power2'
+        });
+
+        this.time.addEvent({
+            delay: 1000,
+            repeat: 3,
+            callback: () => {
+                count--;
+                if (count > 0) {
+                    countText.setText(count.toString());
+                    countText.setScale(1.4);
+                    countText.setColor(count === 2 ? '#3b82f6' : '#10b981');
+                    this.tweens.add({
+                        targets: countText,
+                        scale: 1.0,
+                        duration: 400,
+                        ease: 'Power2'
+                    });
+                } else if (count === 0) {
+                    countText.setText('DO BOJU!');
+                    countText.setColor('#ef4444');
+                    countText.setScale(1.3);
+                    this.tweens.add({
+                        targets: [countText, overlay],
+                        alpha: 0,
+                        scale: 1.6,
+                        duration: 600,
+                        ease: 'Power2',
+                        onComplete: () => {
+                            countText.destroy();
+                            overlay.destroy();
+                            this.isCountdown = false;
+                            this.enemyShootingGraceUntil = this.time.now + 2000;
+                        }
+                    });
+                }
+            }
+        });
     }
 
     applySpeedMultiplier(mult) {
@@ -215,7 +304,9 @@ class MainScene extends Phaser.Scene {
             for (let enemy of this.enemies) {
                 if (enemy.alive && enemy.tank && enemy.tank.body) {
                     enemy.moveSpeed = 80 * mult;
-                    this.physics.velocityFromRotation(enemy.tank.rotation, enemy.moveSpeed, enemy.tank.body.velocity);
+                    if (!this.isCountdown) {
+                        this.physics.velocityFromRotation(enemy.tank.rotation, enemy.moveSpeed, enemy.tank.body.velocity);
+                    }
                 }
             }
         }
@@ -257,13 +348,16 @@ class MainScene extends Phaser.Scene {
         }
     }
 
-    bulletHitPlayer(tank, bullet) {
-        if (!bullet.active) return;
+    bulletHitPlayer(arg1, arg2) {
+        if (this.isCountdown || this.isGameOver) return;
+
+        let bullet = arg1;
+        if (arg1 === this.tank) bullet = arg2;
+
+        if (!bullet || !bullet.active) return;
         bullet.setActive(false);
         bullet.setVisible(false);
-        bullet.body.stop();
-
-        if (this.isGameOver) return;
+        if (bullet.body) bullet.body.stop();
 
         this.playerHealth -= 1;
         this.cameras.main.flash(150, 255, 0, 0);
@@ -279,12 +373,23 @@ class MainScene extends Phaser.Scene {
         }
     }
 
-    bulletHitEnemy(bullet, enemySprite) {
-        if (!bullet.active) return;
+    bulletHitEnemy(arg1, arg2) {
+        if (this.isCountdown || this.isGameOver) return;
+
+        let bullet = arg1;
+        let enemySprite = arg2;
+
+        if (arg1 && arg1.getData && arg1.getData('enemyInstance')) {
+            enemySprite = arg1;
+            bullet = arg2;
+        }
+
+        if (!bullet || !bullet.active) return;
         bullet.setActive(false);
         bullet.setVisible(false);
-        bullet.body.stop();
+        if (bullet.body) bullet.body.stop();
 
+        if (!enemySprite) return;
         const enemy = enemySprite.getData('enemyInstance');
         if (!enemy || !enemy.alive) return;
 
@@ -293,23 +398,16 @@ class MainScene extends Phaser.Scene {
             const exp = this.add.sprite(enemySprite.x, enemySprite.y, 'kaboom').setOrigin(0.5).setDepth(20);
             exp.play('kaboom');
             exp.once('animationcomplete', () => exp.destroy());
-
-            this.enemiesAlive--;
-            this.updateHUD();
-
-            if (this.enemiesAlive <= 0) {
-                this.triggerGameOver(true);
-            }
         } else {
             enemySprite.setTint(0xff9999);
             this.time.delayedCall(100, () => {
-                if (enemySprite.active) enemySprite.clearTint();
+                if (enemySprite && enemySprite.active) enemySprite.clearTint();
             });
         }
     }
 
     fire(time) {
-        if (time > this.nextFire && !this.isGameOver) {
+        if (time > this.nextFire && !this.isGameOver && !this.isCountdown) {
             this.nextFire = time + this.fireRate;
 
             const worldPointer = this.cameras.main.getWorldPoint(this.input.activePointer.x, this.input.activePointer.y);
@@ -386,10 +484,26 @@ class MainScene extends Phaser.Scene {
         this.land.tilePositionX = this.cameras.main.scrollX;
         this.land.tilePositionY = this.cameras.main.scrollY;
 
+        let aliveCount = 0;
         for (let i = 0; i < this.enemies.length; i++) {
             if (this.enemies[i].alive) {
+                aliveCount++;
                 this.enemies[i].update(time, delta);
             }
+        }
+
+        if (this.enemiesAlive !== aliveCount) {
+            this.enemiesAlive = aliveCount;
+            this.updateHUD();
+
+            if (this.enemiesAlive <= 0 && !this.isGameOver) {
+                this.triggerGameOver(true);
+            }
+        }
+
+        if (this.isCountdown) {
+            if (this.tank && this.tank.body) this.tank.body.setVelocity(0, 0);
+            return;
         }
 
         const left = this.cursors.left.isDown || this.wasd.A.isDown;
