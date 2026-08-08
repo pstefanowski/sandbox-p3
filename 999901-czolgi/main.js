@@ -1,313 +1,475 @@
-EnemyTank = function (index, game, player, bullets) {
+class EnemyTank {
+    constructor(index, scene, player, enemyBullets, speedMult = 1.0) {
+        this.index = index;
+        this.scene = scene;
+        this.player = player;
+        this.enemyBullets = enemyBullets;
+        this.health = 3;
+        this.fireRate = 1400;
+        this.nextFire = 0;
+        this.alive = true;
+        this.moveSpeed = 80 * speedMult;
 
-    var x = game.world.randomX;
-    var y = game.world.randomY;
+        const x = Phaser.Math.Between(-900, 900);
+        const y = Phaser.Math.Between(-900, 900);
 
-    this.game = game;
-    this.health = 3;
-    this.player = player;
-    this.bullets = bullets;
-    this.fireRate = 1000;
-    this.nextFire = 0;
-    this.alive = true;
+        this.shadow = scene.add.sprite(x, y, 'enemy', 'shadow').setOrigin(0.5);
+        this.tank = scene.physics.add.sprite(x, y, 'enemy', 'tank1').setOrigin(0.5);
+        this.turret = scene.add.sprite(x, y, 'enemy', 'turret').setOrigin(0.3, 0.5);
 
-    this.shadow = game.add.sprite(x, y, 'enemy', 'shadow');
-    this.tank = game.add.sprite(x, y, 'enemy', 'tank1');
-    this.turret = game.add.sprite(x, y, 'enemy', 'turret');
+        this.shadow.setDepth(1);
+        this.tank.setDepth(2);
+        this.turret.setDepth(3);
 
-    this.shadow.anchor.set(0.5);
-    this.tank.anchor.set(0.5);
-    this.turret.anchor.set(0.3, 0.5);
+        this.tank.setData('enemyInstance', this);
+        this.tank.setData('index', index);
 
-    this.tank.name = index.toString();
-    game.physics.enable(this.tank, Phaser.Physics.ARCADE);
-    this.tank.body.immovable = false;
-    this.tank.body.collideWorldBounds = true;
-    this.tank.body.bounce.setTo(1, 1);
+        this.tank.body.setCollideWorldBounds(true);
+        this.tank.body.setBounce(1, 1);
+        this.tank.setAngle(Phaser.Math.Between(0, 360));
 
-    this.tank.angle = game.rnd.angle();
+        scene.physics.velocityFromRotation(this.tank.rotation, this.moveSpeed, this.tank.body.velocity);
+    }
 
-    game.physics.arcade.velocityFromRotation(this.tank.rotation, 100, this.tank.body.velocity);
+    damage() {
+        this.health -= 1;
+        if (this.health <= 0) {
+            this.alive = false;
+            if (this.shadow) this.shadow.destroy();
+            if (this.turret) this.turret.destroy();
+            if (this.tank) this.tank.destroy();
+            return true;
+        }
+        return false;
+    }
 
+    update(time, delta) {
+        if (!this.alive || !this.tank || !this.tank.active) return;
+
+        this.shadow.setPosition(this.tank.x, this.tank.y);
+        this.shadow.setRotation(this.tank.rotation);
+
+        this.turret.setPosition(this.tank.x, this.tank.y);
+
+        if (!this.player || !this.player.active) return;
+
+        const angleToPlayer = Phaser.Math.Angle.Between(this.tank.x, this.tank.y, this.player.x, this.player.y);
+        this.turret.setRotation(angleToPlayer);
+
+        const dist = Phaser.Math.Distance.Between(this.tank.x, this.tank.y, this.player.x, this.player.y);
+
+        if (dist < 350 && time > this.nextFire) {
+            this.nextFire = time + this.fireRate;
+            this.fireBullet(angleToPlayer);
+        }
+    }
+
+    fireBullet(angle) {
+        let bullet = this.enemyBullets.get(this.turret.x, this.turret.y, 'bullet');
+        if (bullet) {
+            bullet.setActive(true);
+            bullet.setVisible(true);
+            bullet.setPosition(this.turret.x, this.turret.y);
+            bullet.setRotation(angle);
+            bullet.setDepth(4);
+            bullet.body.enable = true;
+            const enemyBulletSpeed = 380 * (this.scene.speedMult || 1.0);
+            this.scene.physics.velocityFromRotation(angle, enemyBulletSpeed, bullet.body.velocity);
+        }
+    }
+}
+
+class MainScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'MainScene' });
+    }
+
+    preload() {
+        this.load.atlas('tank', 'assets/tanks.png', 'assets/tanks.json');
+        this.load.atlas('enemy', 'assets/enemy-tanks.png', 'assets/tanks.json');
+        this.load.image('logo', 'assets/logo.png');
+        this.load.image('bullet', 'assets/bullet.png');
+        this.load.image('earth', 'assets/scorched_earth.png');
+        this.load.spritesheet('kaboom', 'assets/explosion.png', { frameWidth: 64, frameHeight: 64, endFrame: 23 });
+    }
+
+    create() {
+        this.speedMult = window.currentSpeedMultiplier || 1.0;
+        this.maxPlayerSpeed = 160 * this.speedMult;
+        this.maxReverseSpeed = -80 * this.speedMult;
+        this.turnRate = 2.5 * this.speedMult;
+        this.bulletSpeed = 550 * this.speedMult;
+
+        this.physics.world.setBounds(-1000, -1000, 2000, 2000);
+        this.cameras.main.setBounds(-1000, -1000, 2000, 2000);
+
+        if (!this.anims.exists('move')) {
+            this.anims.create({
+                key: 'move',
+                frames: [
+                    { key: 'tank', frame: 'tank1' },
+                    { key: 'tank', frame: 'tank2' },
+                    { key: 'tank', frame: 'tank3' },
+                    { key: 'tank', frame: 'tank4' },
+                    { key: 'tank', frame: 'tank5' },
+                    { key: 'tank', frame: 'tank6' }
+                ],
+                frameRate: 15,
+                repeat: -1
+            });
+        }
+
+        if (!this.anims.exists('kaboom')) {
+            this.anims.create({
+                key: 'kaboom',
+                frames: this.anims.generateFrameNumbers('kaboom', { start: 0, end: 22 }),
+                frameRate: 30,
+                repeat: 0
+            });
+        }
+
+        this.land = this.add.tileSprite(0, 0, 800, 600, 'earth').setOrigin(0, 0).setScrollFactor(0);
+
+        this.shadow = this.add.sprite(0, 0, 'tank', 'shadow').setOrigin(0.5).setDepth(1);
+        this.tank = this.physics.add.sprite(0, 0, 'tank', 'tank1').setOrigin(0.5).setDepth(2);
+        this.tank.body.setCollideWorldBounds(true);
+
+        this.turret = this.add.sprite(0, 0, 'tank', 'turret').setOrigin(0.3, 0.5).setDepth(3);
+
+        this.playerHealth = 5;
+        this.playerMaxHealth = 5;
+        this.isGameOver = false;
+
+        this.bullets = this.physics.add.group({
+            defaultKey: 'bullet',
+            maxSize: 30
+        });
+
+        this.enemyBullets = this.physics.add.group({
+            defaultKey: 'bullet',
+            maxSize: 100
+        });
+
+        this.enemies = [];
+        this.enemiesTotal = 20;
+        this.enemiesAlive = 20;
+
+        for (let i = 0; i < this.enemiesTotal; i++) {
+            const enemy = new EnemyTank(i, this, this.tank, this.enemyBullets, this.speedMult);
+            this.enemies.push(enemy);
+        }
+
+        this.physics.add.overlap(this.enemyBullets, this.tank, this.bulletHitPlayer, null, this);
+
+        for (let i = 0; i < this.enemies.length; i++) {
+            this.physics.add.collider(this.tank, this.enemies[i].tank);
+            this.physics.add.overlap(this.bullets, this.enemies[i].tank, this.bulletHitEnemy, null, this);
+            for (let j = i + 1; j < this.enemies.length; j++) {
+                this.physics.add.collider(this.enemies[i].tank, this.enemies[j].tank);
+            }
+        }
+
+        this.cameras.main.startFollow(this.tank, true, 0.08, 0.08);
+        this.cameras.main.setDeadzone(150, 150);
+
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.wasd = this.input.keyboard.addKeys({
+            W: Phaser.Input.Keyboard.KeyCodes.W,
+            A: Phaser.Input.Keyboard.KeyCodes.A,
+            S: Phaser.Input.Keyboard.KeyCodes.S,
+            D: Phaser.Input.Keyboard.KeyCodes.D
+        });
+
+        this.currentSpeed = 0;
+        this.fireRate = 250;
+        this.nextFire = 0;
+
+        this.logo = this.add.image(400, 200, 'logo').setScrollFactor(0).setDepth(100);
+        this.input.once('pointerdown', () => {
+            if (this.logo) {
+                this.tweens.add({
+                    targets: this.logo,
+                    alpha: 0,
+                    duration: 300,
+                    onComplete: () => {
+                        if (this.logo) {
+                            this.logo.destroy();
+                            this.logo = null;
+                        }
+                    }
+                });
+            }
+        });
+
+        this.createHUD();
+    }
+
+    applySpeedMultiplier(mult) {
+        this.speedMult = mult;
+        this.maxPlayerSpeed = 160 * mult;
+        this.maxReverseSpeed = -80 * mult;
+        this.turnRate = 2.5 * mult;
+        this.bulletSpeed = 550 * mult;
+
+        if (this.enemies) {
+            for (let enemy of this.enemies) {
+                if (enemy.alive && enemy.tank && enemy.tank.body) {
+                    enemy.moveSpeed = 80 * mult;
+                    this.physics.velocityFromRotation(enemy.tank.rotation, enemy.moveSpeed, enemy.tank.body.velocity);
+                }
+            }
+        }
+    }
+
+    createHUD() {
+        this.add.rectangle(400, 30, 760, 44, 0x0f172a, 0.85)
+            .setScrollFactor(0)
+            .setDepth(150)
+            .setStrokeStyle(1, 0x334155);
+
+        this.hpText = this.add.text(40, 30, `❤️ ZDROWIE: ${this.playerHealth}/${this.playerMaxHealth}`, {
+            fontSize: '16px',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontStyle: 'bold',
+            color: '#ef4444'
+        }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(151);
+
+        this.enemyText = this.add.text(300, 30, `🎯 WRODZY: ${this.enemiesAlive} / ${this.enemiesTotal}`, {
+            fontSize: '16px',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontStyle: 'bold',
+            color: '#38bdf8'
+        }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(151);
+
+        this.add.text(760, 30, `WASD / Myszka`, {
+            fontSize: '14px',
+            fontFamily: 'Segoe UI, sans-serif',
+            color: '#94a3b8'
+        }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(151);
+    }
+
+    updateHUD() {
+        if (this.hpText) {
+            this.hpText.setText(`❤️ ZDROWIE: ${Math.max(0, this.playerHealth)}/${this.playerMaxHealth}`);
+        }
+        if (this.enemyText) {
+            this.enemyText.setText(`🎯 WRODZY: ${this.enemiesAlive} / ${this.enemiesTotal}`);
+        }
+    }
+
+    bulletHitPlayer(tank, bullet) {
+        if (!bullet.active) return;
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        bullet.body.stop();
+
+        if (this.isGameOver) return;
+
+        this.playerHealth -= 1;
+        this.cameras.main.flash(150, 255, 0, 0);
+        this.tank.setTint(0xff6666);
+        this.time.delayedCall(150, () => {
+            if (this.tank && this.tank.active) this.tank.clearTint();
+        });
+
+        this.updateHUD();
+
+        if (this.playerHealth <= 0) {
+            this.triggerGameOver(false);
+        }
+    }
+
+    bulletHitEnemy(bullet, enemySprite) {
+        if (!bullet.active) return;
+        bullet.setActive(false);
+        bullet.setVisible(false);
+        bullet.body.stop();
+
+        const enemy = enemySprite.getData('enemyInstance');
+        if (!enemy || !enemy.alive) return;
+
+        const destroyed = enemy.damage();
+        if (destroyed) {
+            const exp = this.add.sprite(enemySprite.x, enemySprite.y, 'kaboom').setOrigin(0.5).setDepth(20);
+            exp.play('kaboom');
+            exp.once('animationcomplete', () => exp.destroy());
+
+            this.enemiesAlive--;
+            this.updateHUD();
+
+            if (this.enemiesAlive <= 0) {
+                this.triggerGameOver(true);
+            }
+        } else {
+            enemySprite.setTint(0xff9999);
+            this.time.delayedCall(100, () => {
+                if (enemySprite.active) enemySprite.clearTint();
+            });
+        }
+    }
+
+    fire(time) {
+        if (time > this.nextFire && !this.isGameOver) {
+            this.nextFire = time + this.fireRate;
+
+            const worldPointer = this.cameras.main.getWorldPoint(this.input.activePointer.x, this.input.activePointer.y);
+            const angle = Phaser.Math.Angle.Between(this.turret.x, this.turret.y, worldPointer.x, worldPointer.y);
+
+            let bullet = this.bullets.get(this.turret.x, this.turret.y, 'bullet');
+            if (bullet) {
+                bullet.setActive(true);
+                bullet.setVisible(true);
+                bullet.setPosition(this.turret.x, this.turret.y);
+                bullet.setRotation(angle);
+                bullet.setDepth(5);
+                bullet.body.enable = true;
+                this.physics.velocityFromRotation(angle, this.bulletSpeed, bullet.body.velocity);
+            }
+        }
+    }
+
+    triggerGameOver(isWin) {
+        this.isGameOver = true;
+
+        if (!isWin) {
+            const exp = this.add.sprite(this.tank.x, this.tank.y, 'kaboom').setOrigin(0.5).setDepth(20);
+            exp.play('kaboom');
+            exp.once('animationcomplete', () => exp.destroy());
+
+            this.tank.setVisible(false);
+            this.shadow.setVisible(false);
+            this.turret.setVisible(false);
+            this.tank.body.enable = false;
+        }
+
+        const titleText = isWin ? 'MISJA ZAKOŃCZONA SUKCESEM!' : 'KONIEC GRY!';
+        const subText = isWin ? `Zniszczyłeś wszystkie ${this.enemiesTotal} czołgów wroga!` : `Twój czołg został zniszczony. Zniszczono: ${this.enemiesTotal - this.enemiesAlive}/${this.enemiesTotal}`;
+        const titleColor = isWin ? '#4caf50' : '#f44336';
+
+        this.add.rectangle(400, 300, 500, 260, 0x111827, 0.95)
+            .setScrollFactor(0)
+            .setDepth(200)
+            .setStrokeStyle(2, isWin ? 0x4caf50 : 0xf44336);
+
+        this.add.text(400, 220, titleText, {
+            fontSize: '24px',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontStyle: 'bold',
+            color: titleColor
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+        this.add.text(400, 270, subText, {
+            fontSize: '16px',
+            fontFamily: 'Segoe UI, sans-serif',
+            color: '#e5e7eb'
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+        const restartBtn = this.add.text(400, 340, 'ZAGRAJ PONOWNIE', {
+            fontSize: '18px',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            backgroundColor: isWin ? '#2e7d32' : '#c62828',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+
+        restartBtn.on('pointerover', () => restartBtn.setStyle({ color: '#ffeb3b' }));
+        restartBtn.on('pointerout', () => restartBtn.setStyle({ color: '#ffffff' }));
+        restartBtn.on('pointerdown', () => {
+            this.scene.restart();
+        });
+    }
+
+    update(time, delta) {
+        if (this.isGameOver) return;
+
+        this.land.tilePositionX = this.cameras.main.scrollX;
+        this.land.tilePositionY = this.cameras.main.scrollY;
+
+        for (let i = 0; i < this.enemies.length; i++) {
+            if (this.enemies[i].alive) {
+                this.enemies[i].update(time, delta);
+            }
+        }
+
+        const left = this.cursors.left.isDown || this.wasd.A.isDown;
+        const right = this.cursors.right.isDown || this.wasd.D.isDown;
+        const up = this.cursors.up.isDown || this.wasd.W.isDown;
+        const down = this.cursors.down.isDown || this.wasd.S.isDown;
+
+        if (left) {
+            this.tank.angle -= this.turnRate;
+        } else if (right) {
+            this.tank.angle += this.turnRate;
+        }
+
+        if (up) {
+            this.currentSpeed = Math.min(this.maxPlayerSpeed, this.currentSpeed + 6 * this.speedMult);
+        } else if (down) {
+            this.currentSpeed = Math.max(this.maxReverseSpeed, this.currentSpeed - 6 * this.speedMult);
+        } else {
+            if (this.currentSpeed > 0) {
+                this.currentSpeed = Math.max(0, this.currentSpeed - 4 * this.speedMult);
+            } else if (this.currentSpeed < 0) {
+                this.currentSpeed = Math.min(0, this.currentSpeed + 4 * this.speedMult);
+            }
+        }
+
+        if (this.currentSpeed !== 0) {
+            this.physics.velocityFromRotation(this.tank.rotation, this.currentSpeed, this.tank.body.velocity);
+            if (!this.tank.anims.isPlaying) {
+                this.tank.play('move');
+            }
+        } else {
+            this.tank.body.setVelocity(0, 0);
+            this.tank.stop();
+            this.tank.setFrame('tank1');
+        }
+
+        this.shadow.setPosition(this.tank.x, this.tank.y);
+        this.shadow.setRotation(this.tank.rotation);
+
+        this.turret.setPosition(this.tank.x, this.tank.y);
+
+        const worldPointer = this.cameras.main.getWorldPoint(this.input.activePointer.x, this.input.activePointer.y);
+        this.turret.rotation = Phaser.Math.Angle.Between(this.turret.x, this.turret.y, worldPointer.x, worldPointer.y);
+
+        if (this.input.activePointer.isDown) {
+            this.fire(time);
+        }
+
+        this.bullets.children.each((bullet) => {
+            if (bullet.active && (bullet.x < -1000 || bullet.x > 1000 || bullet.y < -1000 || bullet.y > 1000)) {
+                bullet.setActive(false);
+                bullet.setVisible(false);
+                bullet.body.stop();
+            }
+        });
+
+        this.enemyBullets.children.each((bullet) => {
+            if (bullet.active && (bullet.x < -1000 || bullet.x > 1000 || bullet.y < -1000 || bullet.y > 1000)) {
+                bullet.setActive(false);
+                bullet.setVisible(false);
+                bullet.body.stop();
+            }
+        });
+    }
+}
+
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    parent: 'game-container',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: false
+        }
+    },
+    scene: MainScene
 };
 
-EnemyTank.prototype.damage = function() {
-
-    this.health -= 1;
-
-    if (this.health <= 0)
-    {
-        this.alive = false;
-
-        this.shadow.kill();
-        this.tank.kill();
-        this.turret.kill();
-
-        return true;
-    }
-
-    return false;
-
-}
-
-EnemyTank.prototype.update = function() {
-
-    this.shadow.x = this.tank.x;
-    this.shadow.y = this.tank.y;
-    this.shadow.rotation = this.tank.rotation;
-
-    this.turret.x = this.tank.x;
-    this.turret.y = this.tank.y;
-    this.turret.rotation = this.game.physics.arcade.angleBetween(this.tank, this.player);
-
-    if (this.game.physics.arcade.distanceBetween(this.tank, this.player) < 300)
-    {
-        if (this.game.time.now > this.nextFire && this.bullets.countDead() > 0)
-        {
-            this.nextFire = this.game.time.now + this.fireRate;
-
-            var bullet = this.bullets.getFirstDead();
-
-            bullet.reset(this.turret.x, this.turret.y);
-
-            bullet.rotation = this.game.physics.arcade.moveToObject(bullet, this.player, 500);
-        }
-    }
-
-};
-
-function preload () {
-
-    game.load.atlas('tank', '../assets/games/tanks/tanks.png', 'assets/games/tanks/tanks.json');
-    game.load.atlas('enemy', '../assets/games/tanks/enemy-tanks.png', 'assets/games/tanks/tanks.json');
-    game.load.image('logo', '../assets/games/tanks/logo.png');
-    game.load.image('bullet', '../assets/games/tanks/bullet.png');
-    game.load.image('earth', '../assets/games/tanks/scorched_earth.png');
-    game.load.spritesheet('kaboom', '../assets/games/tanks/explosion.png', 64, 64, 23);
-    
-}
-
-var land;
-
-var shadow;
-var tank;
-var turret;
-
-var enemies;
-var enemyBullets;
-var enemiesTotal = 0;
-var enemiesAlive = 0;
-var explosions;
-
-var logo;
-
-var currentSpeed = 0;
-var cursors;
-
-var bullets;
-var fireRate = 100;
-var nextFire = 0;
-
-function create () {
-
-    //  Resize our game world to be a 2000 x 2000 square
-    game.world.setBounds(-1000, -1000, 2000, 2000);
-
-    //  Our tiled scrolling background
-    land = game.add.tileSprite(0, 0, 800, 600, 'earth');
-    land.fixedToCamera = true;
-
-    //  The base of our tank
-    tank = game.add.sprite(0, 0, 'tank', 'tank1');
-    tank.anchor.setTo(0.5, 0.5);
-    tank.animations.add('move', ['tank1', 'tank2', 'tank3', 'tank4', 'tank5', 'tank6'], 20, true);
-
-    //  This will force it to decelerate and limit its speed
-    game.physics.enable(tank, Phaser.Physics.ARCADE);
-    tank.body.drag.set(0.2);
-    tank.body.maxVelocity.setTo(400, 400);
-    tank.body.collideWorldBounds = true;
-
-    //  Finally the turret that we place on-top of the tank body
-    turret = game.add.sprite(0, 0, 'tank', 'turret');
-    turret.anchor.setTo(0.3, 0.5);
-
-    //  The enemies bullet group
-    enemyBullets = game.add.group();
-    enemyBullets.enableBody = true;
-    enemyBullets.physicsBodyType = Phaser.Physics.ARCADE;
-    enemyBullets.createMultiple(100, 'bullet');
-    
-    enemyBullets.setAll('anchor.x', 0.5);
-    enemyBullets.setAll('anchor.y', 0.5);
-    enemyBullets.setAll('outOfBoundsKill', true);
-    enemyBullets.setAll('checkWorldBounds', true);
-
-    //  Create some baddies to waste :)
-    enemies = [];
-
-    enemiesTotal = 20;
-    enemiesAlive = 20;
-
-    for (var i = 0; i < enemiesTotal; i++)
-    {
-        enemies.push(new EnemyTank(i, game, tank, enemyBullets));
-    }
-
-    //  A shadow below our tank
-    shadow = game.add.sprite(0, 0, 'tank', 'shadow');
-    shadow.anchor.setTo(0.5, 0.5);
-
-    //  Our bullet group
-    bullets = game.add.group();
-    bullets.enableBody = true;
-    bullets.physicsBodyType = Phaser.Physics.ARCADE;
-    bullets.createMultiple(30, 'bullet', 0, false);
-    bullets.setAll('anchor.x', 0.5);
-    bullets.setAll('anchor.y', 0.5);
-    bullets.setAll('outOfBoundsKill', true);
-    bullets.setAll('checkWorldBounds', true);
-
-    //  Explosion pool
-    explosions = game.add.group();
-
-    for (var i = 0; i < 10; i++)
-    {
-        var explosionAnimation = explosions.create(0, 0, 'kaboom', [0], false);
-        explosionAnimation.anchor.setTo(0.5, 0.5);
-        explosionAnimation.animations.add('kaboom');
-    }
-
-    tank.bringToTop();
-    turret.bringToTop();
-
-    logo = game.add.sprite(0, 200, 'logo');
-    logo.fixedToCamera = true;
-
-    game.input.onDown.add(removeLogo, this);
-
-    game.camera.follow(tank);
-    game.camera.deadzone = new Phaser.Rectangle(150, 150, 500, 300);
-    game.camera.focusOnXY(0, 0);
-
-    cursors = game.input.keyboard.createCursorKeys();
-
-}
-
-function removeLogo () {
-
-    game.input.onDown.remove(removeLogo, this);
-    logo.kill();
-
-}
-
-function update () {
-
-    game.physics.arcade.overlap(enemyBullets, tank, bulletHitPlayer, null, this);
-
-    enemiesAlive = 0;
-
-    for (var i = 0; i < enemies.length; i++)
-    {
-        if (enemies[i].alive)
-        {
-            enemiesAlive++;
-            game.physics.arcade.collide(tank, enemies[i].tank);
-            game.physics.arcade.overlap(bullets, enemies[i].tank, bulletHitEnemy, null, this);
-            enemies[i].update();
-        }
-    }
-
-    if (cursors.left.isDown)
-    {
-        tank.angle -= 4;
-    }
-    else if (cursors.right.isDown)
-    {
-        tank.angle += 4;
-    }
-
-    if (cursors.up.isDown)
-    {
-        //  The speed we'll travel at
-        currentSpeed = 300;
-    }
-    else
-    {
-        if (currentSpeed > 0)
-        {
-            currentSpeed -= 4;
-        }
-    }
-
-    if (currentSpeed > 0)
-    {
-        game.physics.arcade.velocityFromRotation(tank.rotation, currentSpeed, tank.body.velocity);
-    }
-
-    land.tilePosition.x = -game.camera.x;
-    land.tilePosition.y = -game.camera.y;
-
-    //  Position all the parts and align rotations
-    shadow.x = tank.x;
-    shadow.y = tank.y;
-    shadow.rotation = tank.rotation;
-
-    turret.x = tank.x;
-    turret.y = tank.y;
-
-    turret.rotation = game.physics.arcade.angleToPointer(turret);
-
-    if (game.input.activePointer.isDown)
-    {
-        //  Boom!
-        fire();
-    }
-
-}
-
-function bulletHitPlayer (tank, bullet) {
-
-    bullet.kill();
-
-}
-
-function bulletHitEnemy (tank, bullet) {
-
-    bullet.kill();
-
-    var destroyed = enemies[tank.name].damage();
-
-    if (destroyed)
-    {
-        var explosionAnimation = explosions.getFirstExists(false);
-        explosionAnimation.reset(tank.x, tank.y);
-        explosionAnimation.play('kaboom', 30, false, true);
-    }
-
-}
-
-function fire () {
-
-    if (game.time.now > nextFire && bullets.countDead() > 0)
-    {
-        nextFire = game.time.now + fireRate;
-
-        var bullet = bullets.getFirstExists(false);
-
-        bullet.reset(turret.x, turret.y);
-
-        bullet.rotation = game.physics.arcade.moveToPointer(bullet, 1000, game.input.activePointer, 500);
-    }
-
-}
-
-function render () {
-
-    // game.debug.text('Active Bullets: ' + bullets.countLiving() + ' / ' + bullets.length, 32, 32);
-    game.debug.text('Enemies: ' + enemiesAlive + ' / ' + enemiesTotal, 32, 32);
-
-}
-
-
-var game = new Phaser.Game(800, 600, Phaser.AUTO, 'game-container', { preload: preload, create: create, update: update, render: render });
+const game = new Phaser.Game(config);
+window.phaserGame = game;

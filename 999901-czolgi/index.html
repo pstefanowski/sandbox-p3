@@ -1,16 +1,171 @@
 <!doctype html>
-<html lang="en">
+<html lang="pl">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Phaser - Template</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.87.0/phaser.min.js" integrity="sha512-e251dDfxfj70o3iWsf84M612cWbWdTXjVbFXA7MavobTcKB1sCLV+WNiduc20UrpWLXRgi1tgob1TOAfySx9Xg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>Gra Czołgi - Phaser 3</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header {
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            color: #9ca3af;
+        }
+
+        #game-container {
+            width: 800px;
+            height: 600px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            background-color: #000;
+        }
+
+        .bottom-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .controls-info {
+            display: flex;
+            gap: 16px;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+            color: #d1d5db;
+        }
+
+        .controls-info span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .kbd {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .speed-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(17, 24, 39, 0.8);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.8rem;
+            color: #9ca3af;
+        }
+
+        .speed-btn {
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #d1d5db;
+            padding: 4px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .speed-btn.active, .speed-btn:hover {
+            background: #2563eb;
+            color: #fff;
+            border-color: #3b82f6;
+        }
+    </style>
 </head>
 
 <body>
     <div id="app">
+        <div class="header">
+            <h1>CZOŁGI - PHASER 3</h1>
+            <p>Przepisana gra z wyważonym oryginalnym tempem rozgrywki</p>
+        </div>
+
         <div id="game-container"></div>
+
+        <div class="bottom-bar">
+            <div class="controls-info">
+                <span><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> Sterowanie</span>
+                <span><span class="kbd">Myszka</span> Celowanie</span>
+                <span><span class="kbd">LMB</span> Strzał</span>
+            </div>
+
+            <div class="speed-selector">
+                <span>Prędkość:</span>
+                <button class="speed-btn active" id="speed-slow" onclick="setGameSpeed(1.0)">Oryginalna (Wolna)</button>
+                <button class="speed-btn" id="speed-medium" onclick="setGameSpeed(1.35)">Szybsza</button>
+            </div>
+        </div>
     </div>
+
     <script type="module" src="main.js"></script>
+    <script>
+        window.currentSpeedMultiplier = 1.0;
+        function setGameSpeed(mult) {
+            window.currentSpeedMultiplier = mult;
+            document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
+            if (mult === 1.0) document.getElementById('speed-slow').classList.add('active');
+            if (mult === 1.35) document.getElementById('speed-medium').classList.add('active');
+            if (window.phaserGame && window.phaserGame.scene.scenes[0]) {
+                window.phaserGame.scene.scenes[0].applySpeedMultiplier(mult);
+            }
+        }
+    </script>
 </body>
+
 </html>
