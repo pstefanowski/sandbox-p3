@@ -1,17 +1,31 @@
+import { BikePhysics, ENGINE_PROFILES } from './physicsConfig.js';
+
 class UIScene extends Phaser.Scene {
     constructor() {
         super({ key: 'UIScene', active: true });
         this.speedText = null;
+        this.engineText = null;
     }
 
     create() {
         this.speedText = this.add.text(10, 10, 'Speed: 0.00', { fontSize: '16px', fill: '#ffffff' });
+        this.engineText = this.add.text(10, 32, 'Silnik: -', { fontSize: '14px', fill: '#00ffff' });
+        this.add.text(10, 52, 'Zmień silnik: [1] Jawa  [2] GM / GSM  [3] Standard', { fontSize: '12px', fill: '#aaaaaa' });
 
-        // Nasłuchuj na zdarzenie 'updateSpeed' wysyłane ze sceny gry
+        // Nasłuchuj na zdarzenie wysyłane ze sceny gry
         const gameScene = this.scene.get('Example');
         gameScene.events.on('updateSpeed', (speed) => {
             this.speedText.setText('Speed: ' + speed.toFixed(2));
         });
+
+        gameScene.events.on('engineChanged', (engine) => {
+            this.engineText.setText(`Silnik: ${engine.name} (Vmax: ${engine.maxSpeed}, Acc: ${engine.acceleration}, Skręt: ${engine.turnSpeed})`);
+        });
+
+        if (gameScene.physics) {
+            const engine = gameScene.physics.currentEngine;
+            this.engineText.setText(`Silnik: ${engine.name} (Vmax: ${engine.maxSpeed}, Acc: ${engine.acceleration}, Skręt: ${engine.turnSpeed})`);
+        }
     }
 }
 
@@ -31,16 +45,19 @@ class Example extends Phaser.Scene {
     angle;
     player;
     spaceKey;
-    maxSpeed;
+    physics;
 
     create() {
+        // Inicjalizacja fizyki i silnika (np. 'JAWA', 'GM' lub 'DEFAULT')
+        this.physics = new BikePhysics('JAWA');
+
         // Grafika dla statycznego toru
         this.trackGraphics = this.add.graphics({
             lineStyle: { width: 2, color: 0x00ffff },
             fillStyle: { color: 0xff0000 }
         });
 
-        const trackWidth = 800; // Całkowita szerokość toru
+        const trackWidth = 1000; // Całkowita szerokość toru
         const trackHeight = 450; // Całkowita wysokość toru
         const laneWidth = 150; // Szerokość pasa toru
         const centerX = this.sys.game.config.width / 2;
@@ -80,11 +97,15 @@ class Example extends Phaser.Scene {
         this.player = this.add.rectangle(500, 600, 8, 2, 0xff0000); // x, y, szerokość, wysokość, kolor
         this.speed = 0;
         this.angle = 0; // Kąt początkowy (skierowany w prawo)
-        this.maxSpeed = 5;
 
         // --- Inicjalizacja sterowania ---
         this.cursors = this.input.keyboard.createCursorKeys();
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+
+        // Klawisze szybkiej zmiany silnika (1: Jawa, 2: GM/GSM, 3: Standard)
+        this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE).on('down', () => this.setEngine('JAWA'));
+        this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO).on('down', () => this.setEngine('GM'));
+        this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE).on('down', () => this.setEngine('DEFAULT'));
 
         // --- Ustawienia kamery ---
         this.cameras.main.startFollow(this.player);
@@ -94,14 +115,27 @@ class Example extends Phaser.Scene {
         this.scene.launch('UIScene');
     }
 
-    update() {
-        let colorPoint;
+    /**
+     * Zmienia profil silnika i powiadamia sceny
+     * @param {string} engineName 
+     */
+    setEngine(engineName) {
+        this.physics.setEngine(engineName);
+        this.events.emit('engineChanged', this.physics.currentEngine);
+    }
 
-        // --- Stałe fizyki ---
-        const ACCELERATION = 0.04;
-        const TURN_SPEED = 0.02;
-        const MAX_SPEED = 5;
-        let friction = 0.02; // Domyślne tarcie
+    update() {
+        // --- Parametry fizyki pobrane z aktywnego profilu silnika ---
+        const {
+            acceleration,
+            turnSpeed,
+            maxSpeed,
+            friction: baseFriction,
+            offTrackFriction,
+            offTrackSpeedMultiplier
+        } = this.physics;
+
+        let friction = baseFriction;
         const px = this.player.x;
         const py = this.player.y;
 
@@ -132,31 +166,31 @@ class Example extends Phaser.Scene {
         const onTrack = isInsideOuter && !isInsideInner;
 
         if (onTrack) {
-            this.player.fillColor = 0x00FF00; // Zielony
-            friction = 0.02; // Normalne tarcie na torze
+            this.player.fillColor = 0xFF0000; // Czerwony
+            friction = baseFriction; // Normalne tarcie na torze
         } else if (isInsideInner) {
             // na trawie
-            this.player.fillColor = 0xFF0000; // Czerwony
-            friction = 0.3; // Zwiększone tarcie na trawie
-            this.speed *= 0.95;
+            this.player.fillColor = 0x00FF00; // Zielony
+            friction = offTrackFriction; // Zwiększone tarcie na trawie
+            this.speed *= offTrackSpeedMultiplier;
         } else {
-            //banda
+            // banda
             this.player.fillColor = 0x994db3; // Fioletowy
-            friction = 0.3; // Bardzo duże tarcie na bandzie
-            this.speed *= 0.95;
+            friction = offTrackFriction; // Bardzo duże tarcie na bandzie
+            this.speed *= offTrackSpeedMultiplier;
         }
 
         // --- Sterowanie (zmiana kąta) ---
         if (this.cursors.left.isDown) {
-            this.angle -= TURN_SPEED;
+            this.angle -= turnSpeed;
         } else if (this.cursors.right.isDown) {
-            this.angle += TURN_SPEED;
+            this.angle += turnSpeed;
         }
 
         // --- Przyspieszanie i zwalnianie ---
         if (this.spaceKey.isDown) {
-            this.speed += ACCELERATION;
-            if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+            this.speed += acceleration;
+            if (this.speed > maxSpeed) this.speed = maxSpeed;
         } else {
             if (this.speed > 0) this.speed -= friction;
             if (this.speed < 0) this.speed = 0;

@@ -1,10 +1,53 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Phaser - Template</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.87.0/phaser.min.js" integrity="sha512-e251dDfxfj70o3iWsf84M612cWbWdTXjVbFXA7MavobTcKB1sCLV+WNiduc20UrpWLXRgi1tgob1TOAfySx9Xg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.87.0/phaser.min.js"
+        integrity="sha512-e251dDfxfj70o3iWsf84M612cWbWdTXjVbFXA7MavobTcKB1sCLV+WNiduc20UrpWLXRgi1tgob1TOAfySx9Xg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/4.2.1/phaser.min.js"
+        integrity="sha512-PkoMuUtlCMnpnxNjSnOsEXPvRit6fVtCGAN6K9/UAdfiityWVTQ0HarqXorNRphKtEmN6HWj7LjltuCZnjeqsA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #app {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: auto;
+        }
+
+        #game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container canvas {
+            display: block;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+        }
+    </style>
 </head>
 
 <body>
@@ -13,4 +56,5 @@
     </div>
     <script type="module" src="main.js"></script>
 </body>
+
 </html>
