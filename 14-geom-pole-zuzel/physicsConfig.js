@@ -30,7 +30,7 @@ export const ENGINE_PROFILES = {
         id: 'GM',
         name: 'GM (Marzotto)',
         acceleration: 0.032, // Bardzo dynamiczne przyspieszenie
-        turnSpeed: 0.013, // Trudniejszy w opanowaniu na łuku
+        turnSpeed: 0.014, // Trudniejszy w opanowaniu na łuku
         maxSpeed: 4.5,
         friction: 0.02,
         offTrackFriction: 0.32,

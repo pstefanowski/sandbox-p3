@@ -1,7 +1,6 @@
-/**
- * Komponent toru żużlowego (Track).
- * Odpowiada za parametryzację geometrii, renderowanie toru oraz detekcję stref (tor, murawa wewnątrz, banda).
- */
+import { TrackGrid, GRID_MODES } from './trackGrid.js';
+
+export { TrackGrid, GRID_MODES };
 
 export const TRACK_ZONES = {
     TRACK: 'TRACK',     // Nawierzchnia toru
@@ -80,6 +79,12 @@ export class Track {
         this.lineWidth = this.config.lineWidth ?? 2;
 
         this.computeGeometry();
+
+        // Inicjalizacja siatki torowej do wyznaczania optymalnej ścieżki i heatmapy
+        this.grid = new TrackGrid(this);
+        this.debugGraphics = null;
+        this.showOptimalLine = true; // Domyślnie włączona widoczność optymalnej ścieżki
+        this.showHeatmap = false;    // Heatmapa wyłączona domyślnie (włączana klawiszem H)
     }
 
     /**
@@ -102,6 +107,8 @@ export class Track {
      * Rysuje tor w scenie Phaser
      */
     draw() {
+        if (!this.scene?.add) return this;
+
         if (!this.graphics) {
             this.graphics = this.scene.add.graphics();
         } else {
@@ -154,7 +161,73 @@ export class Track {
         this.graphics.closePath();
         this.graphics.strokePath();
 
+        // Rysowanie warstwy debugowej (ścieżka i/lub heatmapa)
+        this.drawDebug();
+
         return this;
+    }
+
+    /**
+     * Rysuje warstwę debugowania (heatmapę oraz linię optymalnej ścieżki)
+     */
+    drawDebug() {
+        if (!this.scene?.add) return;
+
+        if (!this.debugGraphics) {
+            this.debugGraphics = this.scene.add.graphics();
+        } else {
+            this.debugGraphics.clear();
+        }
+
+        if (this.showHeatmap) {
+            this.grid.drawHeatmap(this.debugGraphics);
+        }
+
+        if (this.showOptimalLine) {
+            this.grid.drawOptimalLine(this.debugGraphics);
+        }
+    }
+
+    /**
+     * Przełącza widoczność optymalnej ścieżki
+     * @returns {boolean} aktualny stan
+     */
+    toggleOptimalLine() {
+        this.showOptimalLine = !this.showOptimalLine;
+        this.drawDebug();
+        return this.showOptimalLine;
+    }
+
+    /**
+     * Przełącza widoczność heatmapy
+     * @returns {boolean} aktualny stan
+     */
+    toggleHeatmap() {
+        this.showHeatmap = !this.showHeatmap;
+        this.drawDebug();
+        return this.showHeatmap;
+    }
+
+    /**
+     * Zmienia stan ewolucji toru (bieg lub tryb)
+     * @param {number|string} heatOrMode 
+     */
+    setHeat(heatOrMode) {
+        this.grid.applyHeat(heatOrMode);
+        this.drawDebug();
+    }
+
+    /**
+     * Cyklicznie przełącza tryby toru: Bieg 1 -> Bieg 5 -> Bieg 10 -> Bieg 15 -> Mieszany
+     * @returns {Object} aktualny tryb z GRID_MODES
+     */
+    nextHeatMode() {
+        const sequence = ['HEAT_1', 'HEAT_5', 'HEAT_10', 'HEAT_15', 'MIXED'];
+        const currentIndex = sequence.indexOf(this.grid.currentMode);
+        const nextIndex = (currentIndex + 1) % sequence.length;
+        const nextMode = sequence[nextIndex];
+        this.setHeat(nextMode);
+        return GRID_MODES[nextMode];
     }
 
     /**
@@ -238,6 +311,10 @@ export class Track {
         if (this.graphics) {
             this.graphics.destroy();
             this.graphics = null;
+        }
+        if (this.debugGraphics) {
+            this.debugGraphics.destroy();
+            this.debugGraphics = null;
         }
     }
 }
