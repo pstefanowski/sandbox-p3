@@ -200,9 +200,10 @@ class Example extends Phaser.Scene {
         }
 
         // --- Przyspieszanie i zwalnianie z uwzględnieniem przyczepności nawierzchni ---
+        const effectiveMaxSpeed = maxSpeed * gripMultiplier;
         if (this.spaceKey.isDown) {
-            this.speed += acceleration * gripMultiplier;
-            const effectiveMaxSpeed = maxSpeed * gripMultiplier;
+            const accelStep = this.physics.getAccelerationStep(this.speed, effectiveMaxSpeed, gripMultiplier);
+            this.speed += accelStep;
             if (this.speed > effectiveMaxSpeed) this.speed = effectiveMaxSpeed;
         } else {
             if (this.speed > 0) this.speed -= friction;
